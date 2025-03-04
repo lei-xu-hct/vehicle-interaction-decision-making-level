@@ -177,9 +177,11 @@ std::shared_ptr<Node> MonteCarloTreeSearch::get_best_child(std::shared_ptr<Node>
     std::vector<std::shared_ptr<Node>> best_children;
 
     for (auto child : node->children) {
-        double exploit = child->reward / child->visits;
-        double explore = sqrt(2 * log(node->visits) / child->visits);
-        double score = exploit + scalar * explore;
+        // double exploit = child->reward / child->visits;
+        // double explore = sqrt(2 * log(node->visits) / child->visits);
+        // double score = exploit + scalar * explore;
+
+        double score = ucb_score(node, child, scalar);
         if (score == best_score) {
             best_children.push_back(child);
         } else if (score > best_score) {
@@ -192,6 +194,31 @@ std::shared_ptr<Node> MonteCarloTreeSearch::get_best_child(std::shared_ptr<Node>
     }
 
     return Random::choice(best_children);
+}
+
+double MonteCarloTreeSearch::ucb_score(const std::shared_ptr<Node> node,
+                                       const std::shared_ptr<Node> child,
+                                       const double scalar,
+                                       const UcbType& type) {
+    double exploit = child->reward / child->visits;
+    double explore(0.0);
+    double variance(0.0);
+
+    switch (type) {
+        case UcbType::UCB:
+            explore = sqrt(2 * log(node->visits) / child->visits);
+        case UcbType::UCB_V:
+            variance = (child->reward - exploit * child->reward) / (child->visits - 1);
+            explore = sqrt((2 * log(node->visits) / child->visits) *
+                           std::min(0.25, variance + sqrt(2 * log(node->visits) / child->visits)));
+        case UcbType::UCB_T:
+            explore = sqrt((log(node->visits) / child->visits) *
+                           (1 + pow(child->reward, 2) / child->visits - pow(exploit, 2) +
+                            sqrt(2 * log(node->visits) / child->visits)));
+        default:
+            explore = sqrt(2 * log(node->visits) / child->visits);
+    }
+    return exploit + scalar * explore;
 }
 
 double MonteCarloTreeSearch::default_policy(std::shared_ptr<Node> node) {

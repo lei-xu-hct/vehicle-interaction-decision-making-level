@@ -7,7 +7,7 @@ map_size: 25
 lane_width: 4
 
 # mcts parameters
-computation_budget: 15000
+computation_budget: 500
 lamda: 0.9
 weight_avoid: 20
 weight_safe: 0.2
@@ -19,7 +19,7 @@ weight_velocity: 0.03
 # visualization parameters
 # realistic or linestyle
 vehicle_display_style: "realistic"
-is_show_predict_traj: false
+is_show_predict_traj: true
 ego_vehicle: "vehilce_0"
 
 vehicle_list:

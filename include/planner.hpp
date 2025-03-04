@@ -13,6 +13,8 @@
 #include "utils.hpp"
 #include "vehicle_base.hpp"
 
+enum UcbType { UCB = 0, UCB_V, UCB_T };
+
 class MonteCarloTreeSearch {
   private:
     /* data */
@@ -49,6 +51,10 @@ class MonteCarloTreeSearch {
     std::shared_ptr<Node> tree_policy(std::shared_ptr<Node> node);
     std::shared_ptr<Node> expand(std::shared_ptr<Node> node);
     std::shared_ptr<Node> get_best_child(std::shared_ptr<Node> node, double scalar);
+    double ucb_score(const std::shared_ptr<Node> node,
+                     const std::shared_ptr<Node> child,
+                     const double scalar,
+                     const UcbType& type = UcbType::UCB);
     double default_policy(std::shared_ptr<Node> node);
     void update(std::shared_ptr<Node> node, double r);
 };
