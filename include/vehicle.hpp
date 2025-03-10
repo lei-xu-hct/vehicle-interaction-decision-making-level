@@ -51,7 +51,7 @@ class Vehicle : public VehicleBase {
     Eigen::Matrix<double, 2, 5, Eigen::RowMajor> safezone;
     State vis_text_pos;
 
-    Vehicle(std::string _name, const YAML::Node& cfg);
+    Vehicle(std::string _name, const YAML::Node& cfg, const std::vector<Point>& refline);
     ~Vehicle() {}
 
     void reset(void);

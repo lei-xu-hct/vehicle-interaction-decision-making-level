@@ -33,8 +33,8 @@ const std::vector<std::pair<std::string, std::string>> vehicle_show_config = {
 int Vehicle::global_vehicle_idx = 0;
 PyObject* Vehicle::imshow_func = nullptr;
 
-Vehicle::Vehicle(std::string _name, const YAML::Node& cfg)
-    : VehicleBase(_name), planner(KLevelPlanner::get_instance(cfg)) {
+Vehicle::Vehicle(std::string _name, const YAML::Node& cfg, const std::vector<Point>& refline)
+    : VehicleBase(_name, refline), planner(KLevelPlanner::get_instance(cfg)) {
     YAML::Node vehicle_info = cfg["vehicle_list"][_name];
     level = vehicle_info["level"].as<int>();
     init_x_min = vehicle_info["init"]["x"]["min"].as<double>();
@@ -130,7 +130,11 @@ void Vehicle::excute(void) {
         std::pair<Action, StateList> act_and_traj = planner.planning(*this);
         cur_action = act_and_traj.first;
         excepted_traj = act_and_traj.second;
-        state = utils::kinematic_propagate(state, utils::get_action_value(cur_action), dt);
+        auto cmd = Node::enable_frenet_simulation
+                       ? utils::new_get_action_value(state, *target_line_converter,
+                                                     kDefaultWheelBase, cur_action)
+                       : utils::get_action_value(cur_action);
+        state = utils::kinematic_propagate(state, cmd, dt, Node::enable_frenet_simulation);
         footprint.push_back(state);
     }
 }
@@ -165,6 +169,18 @@ void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
         } else {
             plt::fill(box2d_vec[0], box2d_vec[1], {{"color", color}, {"alpha", "0.5"}});
         }
+    }
+
+    // target refline
+    if (target_line_converter) {
+        std::vector<double> xs, ys;
+        xs.reserve(target_line_converter->refline().size()),
+            ys.reserve(target_line_converter->refline().size());
+        for (const auto& p : target_line_converter->refline()) {
+           xs.emplace_back(p.x);
+           ys.emplace_back(p.y);
+        }
+        plt::plot(xs, ys, "k--");
     }
 }
 
@@ -228,6 +244,7 @@ void VehicleList::set_track_objects(void) {
                 TrackedObject track_object(vehicle_list[j]->name);
                 track_object.state = vehicle_list[j]->state;
                 track_object.target = vehicle_list[j]->target;
+                track_object.target_line_converter = vehicle_list[j]->target_line_converter;
                 vehicle_list[i]->tracked_objects.emplace_back(track_object);
             }
         }

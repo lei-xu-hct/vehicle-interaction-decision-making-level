@@ -27,6 +27,8 @@ class TrackedObject {
     State target;
     std::vector<PredictTraj> predict_trajs;
 
+    std::shared_ptr<XYSLConverter> target_line_converter;
+
     TrackedObject() : name("") {
         state = State(0, 0, 0, 0);
         predict_trajs.clear();

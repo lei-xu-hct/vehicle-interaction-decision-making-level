@@ -34,11 +34,15 @@ class VehicleBase {
     int level;
     bool have_got_target;
     std::vector<TrackedObject> tracked_objects;
+    std::shared_ptr<XYSLConverter> target_line_converter;
 
-    VehicleBase(std::string _name) : name(_name), level(0), have_got_target(false) {
+    VehicleBase(std::string _name, const std::vector<Point>& refline)
+        : name(_name), level(0), have_got_target(false) {
+        target_line_converter = std::make_shared<XYSLConverter>(refline);
         state = State(0, 0, 0, 0);
         target = State(0, 0, 0, 0);
     }
+
     virtual ~VehicleBase(){};
     void set_target(State tar);
     void set_level(int l);

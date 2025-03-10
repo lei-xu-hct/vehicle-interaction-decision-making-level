@@ -60,6 +60,7 @@ void run(int rounds_num,
     double map_size = config["map_size"].as<double>();
     double lane_width = config["lane_width"].as<double>();
     bool is_show_predict_traj = config["is_show_predict_traj"].as<bool>();
+    bool is_enable_frenet_simulation = config["is_enable_frenet_simulation"].as<bool>();
     std::string vehicle_draw_style = config["vehicle_display_style"].as<std::string>();
     std::string ego_vehicle_name;
     if (config["ego_vehicle"]) {
@@ -69,12 +70,17 @@ void run(int rounds_num,
     std::shared_ptr<EnvCrossroads> env = std::make_shared<EnvCrossroads>(map_size, lane_width);
     VehicleBase::initialize(env, 5, 2, 8, 2.4);
     MonteCarloTreeSearch::initialize(config);
-    Node::initialize(config["max_step"].as<int>(), MonteCarloTreeSearch::calc_cur_value);
+    Node::initialize(config["max_step"].as<int>(), MonteCarloTreeSearch::calc_cur_value,
+                     is_enable_frenet_simulation);
 
     VehicleList vehicles;
     for (const auto& yaml_node : config["vehicle_list"]) {
         std::string vehicle_name = yaml_node.first.as<std::string>();
-        std::shared_ptr<Vehicle> vehicle = std::make_shared<Vehicle>(vehicle_name, config);
+        std::vector<Point> refline;
+        for (const auto& p : yaml_node.second["refline"]) {
+            refline.emplace_back(Point(p["x"].as<double>(), p["y"].as<double>()));
+        }
+        std::shared_ptr<Vehicle> vehicle = std::make_shared<Vehicle>(vehicle_name, config, refline);
         vehicles.push_back(vehicle);
     }
     if (vehicles.size() < 1) {

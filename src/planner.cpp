@@ -242,7 +242,7 @@ void MonteCarloTreeSearch::update(std::shared_ptr<Node> node, double r) {
 std::pair<Action, StateList> KLevelPlanner::planning(VehicleBase& ego) const {
     std::vector<VehicleBase> others;
     for (const TrackedObject& obj : ego.tracked_objects) {
-        VehicleBase other(obj.name);
+        VehicleBase other(obj.name, obj.target_line_converter->refline());
         other.state = obj.state;
         other.target = obj.target;
         other.have_got_target = other.is_get_target();
@@ -266,7 +266,8 @@ std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
     const VehicleBase& ego, const std::vector<StateList>& traj) const {
     MonteCarloTreeSearch mcts(traj, config);
     std::shared_ptr<Node> current_node =
-        std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target);
+        std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target,
+                               ego.target_line_converter);
     current_node = mcts.excute(current_node);
     for (int i = 0; i < Node::MAX_LEVEL - 1; ++i) {
         current_node = mcts.get_best_child(current_node, 0);

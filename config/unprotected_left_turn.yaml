@@ -1,5 +1,5 @@
 delta_t: 0.25
-max_step: 8
+max_step: 12
 max_simulation_time: 20
 
 # environment
@@ -7,10 +7,10 @@ map_size: 25
 lane_width: 4
 
 # mcts parameters
-computation_budget: 500
+computation_budget: 1000
 lamda: 0.9
 weight_avoid: 20
-weight_safe: 0.2
+weight_safe: 20
 weight_offroad: 2
 weight_direction: 1
 weight_distance: 0.1
@@ -18,8 +18,9 @@ weight_velocity: 0.03
 
 # visualization parameters
 # realistic or linestyle
-vehicle_display_style: "realistic"
+vehicle_display_style: "linestyle"
 is_show_predict_traj: true
+is_enable_frenet_simulation: true
 ego_vehicle: "vehilce_0"
 
 vehicle_list:
@@ -43,6 +44,17 @@ vehicle_list:
     text:
       x: 10
       y: -15
+    refline:
+      - x: 2
+        y: -25
+      - x: 2
+        y: -1
+      - x: -8
+        y: 2
+      - x: -25
+        y: 2  
+      - x: -50
+        y: 2  
   vehilce_1:
     level: 0
     init:
@@ -63,3 +75,14 @@ vehicle_list:
     text:
       x: 10
       y: 15
+    refline:
+      - x: -2
+        y: 25
+      - x: -2
+        y: 0
+      - x: -2
+        y: 2
+      - x: -2
+        y: -20
+      - x: -2
+        y: -50

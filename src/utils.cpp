@@ -18,6 +18,7 @@
 int Node::MAX_LEVEL = 6;
 // double (*Node::calc_value_callback)(std::shared_ptr<Node>, double) = nullptr;
 std::function<double(std::shared_ptr<Node>, double)> Node::calc_value_callback;
+bool Node::enable_frenet_simulation = false;
 
 std::default_random_engine Random::engine(std::random_device{}());
 
@@ -34,14 +35,20 @@ double Random::uniform(double _min, double _max) {
     return dist(Random::engine);
 }
 
-Node::Node(
-    State _state, int _level, std::shared_ptr<Node> p, Action act, StateList others, State goal)
+Node::Node(State _state,
+           int _level,
+           std::shared_ptr<Node> p,
+           const Action& act,
+           const StateList& others,
+           const State& goal,
+           std::shared_ptr<XYSLConverter> converter)
     : state(_state),
       cur_level(_level),
       parent(p),
       action(act),
       other_agent_state(others),
-      goal_pose(goal) {
+      goal_pose(goal),
+      xysl_converter(converter) {
     value = 0.0;
     reward = 0.0;
     visits = 0;
@@ -51,11 +58,19 @@ bool Node::is_terminal(void) { return cur_level >= Node::MAX_LEVEL; }
 
 bool Node::is_fully_expanded(void) { return children.size() >= ACTION_LIST.size(); }
 
-std::shared_ptr<Node> Node::add_child(Action next_action, double delta_t, StateList others) {
+std::shared_ptr<Node> Node::add_child(const Action& next_action,
+                                      double delta_t,
+                                      const StateList& others) {
+    auto cmd =
+        Node::enable_frenet_simulation
+            ? utils::new_get_action_value(state, *xysl_converter, kDefaultWheelBase, next_action)
+            : utils::get_action_value(next_action);
     State new_state =
-        utils::kinematic_propagate(state, utils::get_action_value(next_action), delta_t);
-    std::shared_ptr<Node> child = std::make_shared<Node>(
-        new_state, cur_level + 1, shared_from_this(), next_action, others, goal_pose);
+        utils::kinematic_propagate(state, cmd, delta_t, Node::enable_frenet_simulation);
+
+    std::shared_ptr<Node> child =
+        std::make_shared<Node>(new_state, cur_level + 1, shared_from_this(), next_action, others,
+                               goal_pose, xysl_converter);
     child->actions = actions;
     child->actions.push_back(next_action);
     if (Node::calc_value_callback) {
@@ -72,10 +87,15 @@ std::shared_ptr<Node> Node::add_child(Action next_action, double delta_t, StateL
 
 std::shared_ptr<Node> Node::next_node(double delta_t, StateList others) {
     Action next_action = Random::choice(ACTION_LIST);
+    auto cmd =
+        Node::enable_frenet_simulation
+            ? utils::new_get_action_value(state, *xysl_converter, kDefaultWheelBase, next_action)
+            : utils::get_action_value(next_action);
     State new_state =
-        utils::kinematic_propagate(state, utils::get_action_value(next_action), delta_t);
-    std::shared_ptr<Node> node =
-        std::make_shared<Node>(new_state, cur_level + 1, nullptr, next_action, others, goal_pose);
+        utils::kinematic_propagate(state, cmd, delta_t, Node::enable_frenet_simulation);
+
+    std::shared_ptr<Node> node = std::make_shared<Node>(
+        new_state, cur_level + 1, nullptr, next_action, others, goal_pose, xysl_converter);
     if (Node::calc_value_callback) {
         Node::calc_value_callback(node, value);
     } else {
@@ -87,6 +107,52 @@ std::shared_ptr<Node> Node::next_node(double delta_t, StateList others) {
 
 namespace utils {
 
+constexpr double kMaxFrontWheelAngle = 35.0 / 57.3;
+constexpr double kSteerControlGain = 1.5;
+constexpr double kMaxLookaheadDist = 50.0;
+constexpr double kMinLookaheadDist = 3.0;
+
+void FindGoalPoint(const State& vehicle,
+                   const XYSLConverter& refline,
+                   const double offset,
+                   State& goal_point) {
+    // TODO (xl)
+    Point goal;
+    double vehicle_s(0.0), vehicle_l(0.0);
+    goal.x = vehicle.x;
+    goal.y = vehicle.y;
+
+    Point refline_dir;
+    refline.convertToSL(goal, vehicle_s, vehicle_l, &refline_dir);
+
+    // 1、计算预瞄距离s
+    Point vehicle_dir = {cos(vehicle.yaw), sin(vehicle.yaw)};
+    const auto refline_dir_val = refline_dir.dot(vehicle_dir);
+    bool same_dir = refline_dir_val > 0.0 ? true : false;
+
+    double look_ahead_dist =
+        vehicle.v * refline_dir_val > 0.0
+            ? std::min(std::max(kMinLookaheadDist, vehicle.v * kSteerControlGain),
+                       kMaxLookaheadDist)
+            : -kMinLookaheadDist;
+
+    // 2、SLTOXY
+    double goal_s = vehicle_s + look_ahead_dist;
+    refline.convertToXY(goal_s, vehicle_l + (same_dir ? 1.0 : -1.0) * offset, goal);
+
+    goal_point = State(goal.x, goal.y, 0, 0);
+}
+
+double PurePursuit(const double wheelbase, const State& vehicle, const State& goal_point) {
+    double steer = 0.0f;
+    double dis2prepoint = std::sqrt((goal_point.y - vehicle.y) * (goal_point.y - vehicle.y) +
+                                    (goal_point.x - vehicle.x) * (goal_point.x - vehicle.x));
+    double alpha = atan2(goal_point.y - vehicle.y, goal_point.x - vehicle.x) - vehicle.yaw;
+    steer = atan2(2.0 * wheelbase * sin(alpha), dis2prepoint);
+    steer = std::max(std::min(kMaxFrontWheelAngle, steer), -kMaxFrontWheelAngle);
+    return steer;
+}
+
 std::string get_action_name(Action action) { return ACTIONNAMES[static_cast<size_t>(action)]; }
 
 Eigen::Vector2d get_action_value(Action act) {
@@ -96,6 +162,30 @@ Eigen::Vector2d get_action_value(Action act) {
         {Action::DECELERATE, {-2.5, 0}},   {Action::BRAKE, {-5, 0}}};
 
     return ACTION_MAP[act];
+}
+
+Eigen::Vector2d new_get_action_value(const State& vehicle,
+                                     const XYSLConverter& refline,
+                                     const double wheelbase,
+                                     const Action& act) {
+    // 通过refline的偏移角度来计算action的值
+    static double kLatOffset = 0.3;
+    static std::unordered_map<Action, Eigen::Vector2d> NEW_ACTION_MAP = {
+        {Action::MAINTAIN, {0, 0}},
+        {Action::TURNLEFT, {0, kLatOffset}},
+        {Action::TURNRIGHT, {0, -kLatOffset}},
+        {Action::ACCELERATE, {2.0, 0}},
+        {Action::DECELERATE, {-2.5, 0}},
+        {Action::BRAKE, {-5, 0}}};
+
+    State goal;
+    Eigen::Vector2d ctrl = NEW_ACTION_MAP[act];
+    FindGoalPoint(vehicle, refline, ctrl[1], goal);
+
+    double steer = PurePursuit(wheelbase, vehicle, goal);
+    ctrl[1] = steer;
+
+    return ctrl;
 }
 
 bool has_overlap(Eigen::MatrixXd box2d_0, Eigen::MatrixXd box2d_1) {
@@ -140,7 +230,7 @@ bool has_overlap(Eigen::MatrixXd box2d_0, Eigen::MatrixXd box2d_1) {
     return true;
 }
 
-State kinematic_propagate(const State& state, Eigen::Vector2d act, double dt) {
+State kinematic_propagate(const State& state, Eigen::Vector2d act, double dt, const bool frenet) {
     State next_state;
     double acc = act[0];
     double omega = act[1];
@@ -148,7 +238,9 @@ State kinematic_propagate(const State& state, Eigen::Vector2d act, double dt) {
     next_state.x = state.x + state.v * cos(state.yaw) * dt;
     next_state.y = state.y + state.v * sin(state.yaw) * dt;
     next_state.v = state.v + acc * dt;
-    next_state.yaw = state.yaw + omega * dt;
+
+    // frenet模式下, 横向控制量为steer
+    next_state.yaw = state.yaw + (frenet ? state.v / kDefaultWheelBase * tan(act[1]) : omega) * dt;
 
     while (next_state.yaw > 2 * M_PI) {
         next_state.yaw -= 2 * M_PI;
@@ -157,10 +249,10 @@ State kinematic_propagate(const State& state, Eigen::Vector2d act, double dt) {
         next_state.yaw += 2 * M_PI;
     }
 
-    if (next_state.v > 20) {
-        next_state.v = 20;
-    } else if (next_state.v < -20) {
-        next_state.v = -20;
+    if (next_state.v > kMaxSpeed) {
+        next_state.v = kMaxSpeed;
+    } else if (next_state.v < -kMaxSpeed) {
+        next_state.v = -kMaxSpeed;
     }
 
     return next_state;

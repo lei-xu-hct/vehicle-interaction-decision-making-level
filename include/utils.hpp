@@ -19,6 +19,11 @@
 
 #include <Eigen/Core>
 
+#include "refline_generator.hpp"
+
+constexpr double kDefaultWheelBase = 2.8;  // TODO(xl)
+constexpr double kMaxSpeed = 20.0;         // m/s
+
 enum class Action { MAINTAIN, TURNLEFT, TURNRIGHT, ACCELERATE, DECELERATE, BRAKE };
 const std::vector<Action> ACTION_LIST = {
     Action::MAINTAIN,    // (0, 0)
@@ -77,10 +82,13 @@ class State {
     double y;
     double yaw;
     double v;
+    double s;
 
-    State() : x(0), y(0), yaw(0), v(0) {}
+    State() : x(0), y(0), yaw(0), v(0), s(0) {}
     State(double _x, double _y, double _yaw, double _v) : x(_x), y(_y), yaw(_yaw), v(_v) {}
     ~State() {}
+
+    void SetS(const double _s) { this->s = _s; }
 
     std::vector<double> to_vector(void) { return std::vector<double>{x, y, yaw, v}; }
 };
@@ -135,7 +143,7 @@ class StateList {
         if (states.size() < 1) {
             return;
         }
-        State expand_state = states[-1];
+        const State& expand_state = states.back();  // states.back()
         expand(excepted_len, expand_state);
     }
 
@@ -188,6 +196,7 @@ class Node : public std::enable_shared_from_this<Node> {
     static int MAX_LEVEL;
     // static double (*calc_value_callback)(std::shared_ptr<Node>, double);
     static std::function<double(std::shared_ptr<Node>, double)> calc_value_callback;
+    static bool enable_frenet_simulation;
 
     State state;
     double value;
@@ -201,32 +210,54 @@ class Node : public std::enable_shared_from_this<Node> {
     std::vector<Action> actions;
     StateList other_agent_state;
 
+    std::shared_ptr<XYSLConverter> xysl_converter{nullptr};
+
     Node() = delete;
     Node(State _state,
          int _level,
          std::shared_ptr<Node> p,
-         Action act,
-         StateList others,
-         State goal);
+         const Action& act,
+         const StateList& others,
+         const State& goal,
+         std::shared_ptr<XYSLConverter> converter);
     ~Node() {}
 
-    static void initialize(int max_level, double (*callback)(std::shared_ptr<Node>, double)) {
+    static void initialize(int max_level,
+                           double (*callback)(std::shared_ptr<Node>, double),
+                           bool enable_frenet = false) {
         Node::MAX_LEVEL = max_level;
         Node::calc_value_callback = callback;
+        Node::enable_frenet_simulation = enable_frenet;
     }
 
     bool is_terminal(void);
     bool is_fully_expanded(void);
-    std::shared_ptr<Node> add_child(Action next_action, double delta_t, StateList others);
+    std::shared_ptr<Node> add_child(const Action& next_action,
+                                    double delta_t,
+                                    const StateList& others);
     std::shared_ptr<Node> next_node(double delta_t, StateList others);
 };
 
 namespace utils {
+void FindGoalPoint(const State& vehicle,
+                   const XYSLConverter& refline,
+                   const double offset,
+                   State& goal_point);
+
+double PurePursuit(const double wheelbase, const State& vehicle, const State& goal_point);
 
 std::string get_action_name(Action action);
 Eigen::Vector2d get_action_value(Action act);
+Eigen::Vector2d new_get_action_value(const State& vehicle,
+                                     const XYSLConverter& refline,
+                                     const double wheelbase,
+                                     const Action& act);
+
 bool has_overlap(Eigen::MatrixXd box2d_0, Eigen::MatrixXd box2d_1);
-State kinematic_propagate(const State& state, Eigen::Vector2d act, double dt);
+State kinematic_propagate(const State& state,
+                          Eigen::Vector2d act,
+                          double dt,
+                          const bool frenet = false);
 std::string absolute_path(std::string path);
 std::vector<float> imread(std::string filename, int& rows, int& cols, int& colors);
 }  // namespace utils
