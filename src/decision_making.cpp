@@ -22,7 +22,7 @@
 #include "env.hpp"
 #include "utils.hpp"
 #include "vehicle.hpp"
-#include "vehicle_base.hpp"
+#include "agent_base.hpp"
 #include "planner.hpp"
 
 using std::string;
@@ -100,8 +100,12 @@ void run(int rounds_num,
 
         spdlog::info("================== Round {} ==================", iter);
         for (auto vehicle : vehicles) {
-            spdlog::info("{} >>> init_x: {:.2f}, init_y: {:.2f}, init_v: {:.2f}", vehicle->name,
-                         vehicle->state.x, vehicle->state.y, vehicle->state.v);
+            spdlog::info(
+                "{} >>> init_x: {:.2f}, init_y: {:.2f}, init_v: {:.2f}, len: {:.1f}, width: "
+                "{:.1f}, safe_len: {:.1f}, safe_width: {:.1f}",
+                vehicle->name, vehicle->state.x, vehicle->state.y, vehicle->state.v,
+                vehicle->agent_param_.length, vehicle->agent_param_.width,
+                vehicle->agent_param_.safe_length, vehicle->agent_param_.safe_width);
         }
 
         double timestamp = 0.0;
@@ -143,20 +147,20 @@ void run(int rounds_num,
                 plt::cla();
                 env->draw_env();
                 for (const std::shared_ptr<Vehicle>& vehicle : vehicles) {
-                    auto excepted_traj = vehicle->excepted_traj.to_vector();
+                    auto excepted_traj = vehicle->excepted_traj_.to_vector();
                     vehicle->draw_vehicle(vehicle_draw_style);
-                    plt::plot({vehicle->target.x}, {vehicle->target.y},
+                    plt::plot({vehicle->target_.x}, {vehicle->target_.y},
                               {{"marker", "x"}, {"color", vehicle->color}});
                     plt::plot(excepted_traj[0], excepted_traj[1],
                               {{"color", vehicle->color}, {"linewidth", "1"}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y + 3,
-                              fmt::format("level {:d}", vehicle->level),
+                              fmt::format("level {:d}", vehicle->level_),
                               {{"color", vehicle->color}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y,
                               fmt::format("v = {:.2f} m/s", vehicle->state.v),
                               {{"color", vehicle->color}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y - 3,
-                              fmt::format("{}", utils::get_action_name(vehicle->cur_action)),
+                              fmt::format("{}", utils::get_action_name(vehicle->cur_action_)),
                               {{"color", vehicle->color}});
                 }
                 if (is_show_predict_traj) {
@@ -165,7 +169,7 @@ void run(int rounds_num,
                         spdlog::warn("ego_vehicle parameter in yaml is none, defualt: " +
                                      ego_vehicle_name);
                     }
-                    for (const TrackedObject& obj : vehicles[ego_vehicle_name]->tracked_objects) {
+                    for (const TrackedObject& obj : vehicles[ego_vehicle_name]->tracked_objects_) {
                         for (const PredictTraj& predict_traj : obj.predict_trajs) {
                             double belief = predict_traj.confidence;
                             std::vector<std::vector<double>> prediction =
@@ -190,12 +194,12 @@ void run(int rounds_num,
             plt::clf();
             env->draw_env();
             for (std::shared_ptr<Vehicle>& vehicle : vehicles) {
-                for (const State& state : vehicle->footprint) {
+                for (const State& state : vehicle->footprint_) {
                     vehicle->state = state;
                     vehicle->draw_vehicle(vehicle_draw_style, true);
                 }
                 plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y + 3,
-                          fmt::format("level {:d}", vehicle->level), {{"color", vehicle->color}});
+                          fmt::format("level {:d}", vehicle->level_), {{"color", vehicle->color}});
             }
             plt::xlim(-map_size, map_size);
             plt::ylim(-map_size, map_size);

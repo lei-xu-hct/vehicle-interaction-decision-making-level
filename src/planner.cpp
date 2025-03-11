@@ -61,7 +61,7 @@ double MonteCarloTreeSearch::calc_cur_value(std::shared_ptr<Node> node, double l
     }
 
     int offroad = 0;
-    for (auto& rect : AgentBase::env->rect_mat) {
+    for (auto& rect : AgentBase::env_->rect_mat) {
         if (utils::has_overlap(ego_box2d, rect)) {
             offroad = -1;
             break;
@@ -95,13 +95,13 @@ bool MonteCarloTreeSearch::is_opposite_direction(State pos, Eigen::MatrixXd ego_
     double y = pos.y;
     double yaw = pos.yaw;
 
-    for (auto laneline : AgentBase::env->laneline_mat) {
+    for (auto laneline : AgentBase::env_->laneline_mat) {
         if (utils::has_overlap(ego_box2d, laneline)) {
             return true;
         }
     }
 
-    double lanewidth = AgentBase::env->lanewidth;
+    double lanewidth = AgentBase::env_->lanewidth;
     if (x > -lanewidth && x < 0 && (y < -lanewidth || y > lanewidth)) {
         // down lane
         if (yaw > 0 && yaw < M_PI) {
@@ -244,11 +244,11 @@ void MonteCarloTreeSearch::update(std::shared_ptr<Node> node, double r) {
 
 std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
     std::vector<AgentBase> others;
-    for (const TrackedObject& obj : ego.tracked_objects) {
-        AgentBase other(obj.name, obj.target_line_converter->refline(), obj.agent_param);
+    for (const TrackedObject& obj : ego.tracked_objects_) {
+        AgentBase other(obj.name, obj.target_line_converter_->refline(), obj.agent_param);
         other.state = obj.state;
-        other.target = obj.target;
-        other.have_got_target = other.is_get_target();
+        other.target_ = obj.target_;
+        other.have_got_target_ = other.is_get_target();
         other.agent_param_ = obj.agent_param;
         others.emplace_back(other);
     }
@@ -257,8 +257,8 @@ std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
 
     for (size_t i = 0; i < others.size(); ++i) {
         PredictTraj predict_traj{1.0, other_prediction[i]};
-        ego.tracked_objects[i].predict_trajs.clear();
-        ego.tracked_objects[i].predict_trajs.emplace_back(predict_traj);
+        ego.tracked_objects_[i].predict_trajs.clear();
+        ego.tracked_objects_[i].predict_trajs.emplace_back(predict_traj);
     }
 
     std::pair<std::vector<Action>, StateList> ret = forward_simulate(ego, other_prediction);
@@ -270,8 +270,8 @@ std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
     const AgentBase& ego, const std::vector<StateList>& traj) const {
     MonteCarloTreeSearch mcts(traj, config);
     std::shared_ptr<Node> current_node =
-        std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target,
-                               ego.target_line_converter, ego.agent_param_);
+        std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target_,
+                               ego.target_line_converter_, ego.agent_param_);
     current_node = mcts.excute(current_node);
     for (int i = 0; i < Node::MAX_LEVEL - 1; ++i) {
         current_node = mcts.get_best_child(current_node, 0);
@@ -299,7 +299,7 @@ std::vector<StateList> KLevelPlanner::get_prediction(const AgentBase& ego,
                                                      const std::vector<AgentBase>& others) const {
     std::vector<StateList> pred_trajectory;
 
-    if (ego.level == 0) {
+    if (ego.level_ == 0) {
         for (const AgentBase& other : others) {
             StateList pred_traj;
             for (size_t i = 0; i < steps + 1; ++i) {
@@ -307,9 +307,9 @@ std::vector<StateList> KLevelPlanner::get_prediction(const AgentBase& ego,
             }
             pred_trajectory.emplace_back(pred_traj);
         }
-    } else if (ego.level > 0) {
+    } else if (ego.level_ > 0) {
         for (size_t idx = 0; idx < others.size(); ++idx) {
-            if (others[idx].have_got_target) {
+            if (others[idx].have_got_target_) {
                 StateList pred_traj;
                 for (size_t i = 0; i < steps + 1; ++i) {
                     pred_traj.push_back(others[idx].state);
@@ -318,7 +318,7 @@ std::vector<StateList> KLevelPlanner::get_prediction(const AgentBase& ego,
                 continue;
             }
             AgentBase exchanged_ego = others[idx];
-            exchanged_ego.level = ego.level - 1;
+            exchanged_ego.level_ = ego.level_ - 1;
             std::vector<AgentBase> exchanged_others = {ego};
             for (size_t i = 0; i < others.size(); ++i) {
                 if (i != idx) {

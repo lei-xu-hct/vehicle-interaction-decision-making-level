@@ -24,10 +24,10 @@ class TrackedObject {
   public:
     std::string name;
     State state;
-    State target;
+    State target_;
     std::vector<PredictTraj> predict_trajs;
 
-    std::shared_ptr<XYSLConverter> target_line_converter;
+    std::shared_ptr<XYSLConverter> target_line_converter_;
 
     AgentParam agent_param;
 

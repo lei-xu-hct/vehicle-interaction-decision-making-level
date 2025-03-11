@@ -8,17 +8,13 @@
 
 #include <spdlog/spdlog.h>
 
-#include "vehicle_base.hpp"
+#include "agent_base.hpp"
 
-double AgentBase::length = 5;
-double AgentBase::width = 2;
-double AgentBase::safe_length = 8;
-double AgentBase::safe_width = 2.4;
-std::shared_ptr<EnvCrossroads> AgentBase::env = nullptr;
+std::shared_ptr<EnvCrossroads> AgentBase::env_ = nullptr;
 
-void AgentBase::set_target(State tar) {
+void AgentBase::set_target(const State& tar) {
     if (tar.x >= -25 && tar.x <= 25 && tar.y >= -25 && tar.y <= 25) {
-        target = tar;
+        target_ = tar;
     } else {
         spdlog::error("set_target error, the target range must >= -25 and <= 25 !");
     }
@@ -26,12 +22,12 @@ void AgentBase::set_target(State tar) {
 
 void AgentBase::set_level(int l) {
     if (l >= 0 && l < 3) {
-        level = l;
+        level_ = l;
     } else {
         spdlog::error("set_level error, the level must be >= 0 and > 3 !");
     }
 }
 
 bool AgentBase::is_get_target(void) const {
-    return have_got_target || hypot(state.x - target.x, state.y - target.y) < 1.7;
+    return have_got_target_ || hypot(state.x - target_.x, state.y - target_.y) < 1.7;
 }

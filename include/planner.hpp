@@ -11,7 +11,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "utils.hpp"
-#include "vehicle_base.hpp"
+#include "agent_base.hpp"
 
 enum UcbType { UCB = 0, UCB_V, UCB_T };
 

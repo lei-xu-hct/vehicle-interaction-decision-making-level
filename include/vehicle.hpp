@@ -16,52 +16,30 @@
 
 #include "matplotlibcpp.h"
 #include "utils.hpp"
-#include "vehicle_base.hpp"
+#include "agent_base.hpp"
 #include "planner.hpp"
 
 class Vehicle : public AgentBase {
-  private:
-    double dt;
-    KLevelPlanner& planner;
-    double init_x_min;
-    double init_x_max;
-    double init_y_min;
-    double init_y_max;
-    double init_v_min;
-    double init_v_max;
-    double init_yaw;
-    static int global_vehicle_idx;
-    static PyObject* imshow_func;
-
-    struct Outlook {
-        int rows;
-        int cols;
-        int colors;
-        std::vector<float> data;
-    };
-    Outlook outlook;
-    void imshow(const Outlook& out, const State& state, std::vector<double> para);
-
+  
   public:
-    std::string color;
-    Action cur_action;
-    StateList excepted_traj;
-    std::vector<State> footprint;
-    Eigen::Matrix<double, 2, 5, Eigen::RowMajor> vehicle_box2d;
-    Eigen::Matrix<double, 2, 5, Eigen::RowMajor> safezone;
-    State vis_text_pos;
-
     Vehicle(std::string _name,
             const YAML::Node& cfg,
             const std::vector<Point>& refline,
             const AgentParam& param);
     ~Vehicle() {}
 
-    void reset(void);
-    void excute(void);
-    void draw_vehicle(std::string draw_style = "realistic", bool fill_mode = false);
-    bool operator==(const Vehicle& other) const { return name == other.name; }
-    bool operator!=(const Vehicle& other) const { return name != other.name; }
+    void reset(void) override;
+    void excute(void) override;
+    void draw_vehicle(std::string draw_style = "realistic", bool fill_mode = false) override;
+
+  private:
+    KLevelPlanner& planner;
+   
+    // display
+    static int global_vehicle_idx;
+    static PyObject* imshow_func;
+
+    void imshow(const Outlook& out, const State& state, std::vector<double> para);
 };
 
 class VehicleList {

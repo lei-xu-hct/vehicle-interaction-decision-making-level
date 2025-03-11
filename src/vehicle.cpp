@@ -39,7 +39,7 @@ Vehicle::Vehicle(std::string _name,
                  const AgentParam& param)
     : AgentBase(_name, refline, param), planner(KLevelPlanner::get_instance(cfg)) {
     YAML::Node vehicle_info = cfg["vehicle_list"][_name];
-    level = vehicle_info["level"].as<int>();
+    level_ = vehicle_info["level"].as<int>();
     init_x_min = vehicle_info["init"]["x"]["min"].as<double>();
     init_x_max = vehicle_info["init"]["x"]["max"].as<double>();
     init_y_min = vehicle_info["init"]["y"]["min"].as<double>();
@@ -47,20 +47,20 @@ Vehicle::Vehicle(std::string _name,
     init_v_min = vehicle_info["init"]["v"]["min"].as<double>();
     init_v_max = vehicle_info["init"]["v"]["max"].as<double>();
     init_yaw = vehicle_info["init"]["yaw"].as<double>();
-    target.x = vehicle_info["target"]["x"].as<double>();
-    target.y = vehicle_info["target"]["y"].as<double>();
-    target.yaw = vehicle_info["target"]["yaw"].as<double>();
+    target_.x = vehicle_info["target"]["x"].as<double>();
+    target_.y = vehicle_info["target"]["y"].as<double>();
+    target_.yaw = vehicle_info["target"]["yaw"].as<double>();
     vis_text_pos.x = vehicle_info["text"]["x"].as<double>();
     vis_text_pos.y = vehicle_info["text"]["y"].as<double>();
 
     int local_loop_idx = Vehicle::global_vehicle_idx % vehicle_show_config.size();
     color = vehicle_show_config[local_loop_idx].first;
     std::string vehicle_pic_path = vehicle_show_config[local_loop_idx].second;
-    outlook.data = utils::imread(vehicle_pic_path, outlook.rows, outlook.cols, outlook.colors);
+    outlook_.data = utils::imread(vehicle_pic_path, outlook_.rows, outlook_.cols, outlook_.colors);
 
     vehicle_box2d = AgentBase::get_box2d(state, agent_param_);
     safezone = AgentBase::get_safezone(state, agent_param_);
-    dt = cfg["delta_t"].as<double>();
+    dt_ = cfg["delta_t"].as<double>();
 
     if (imshow_func == nullptr && Vehicle::global_vehicle_idx == 0) {
         Py_Initialize();
@@ -111,41 +111,41 @@ void Vehicle::imshow(const Outlook& out, const State& state, std::vector<double>
 }
 
 void Vehicle::reset(void) {
-    footprint.clear();
-    cur_action = Action::MAINTAIN;
-    excepted_traj = StateList();
-    have_got_target = false;
+    footprint_.clear();
+    cur_action_ = Action::MAINTAIN;
+    excepted_traj_ = StateList();
+    have_got_target_ = false;
 
     state.x = Random::uniform(init_x_min, init_x_max);
     state.y = Random::uniform(init_y_min, init_y_max);
     state.v = Random::uniform(init_v_min, init_v_max);
     state.yaw = init_yaw;
-    footprint.push_back(state);
+    footprint_.push_back(state);
 }
 
 void Vehicle::excute(void) {
     if (is_get_target()) {
-        have_got_target = true;
+        have_got_target_ = true;
         state.v = 0;
-        cur_action = Action::MAINTAIN;
-        excepted_traj = StateList();
+        cur_action_ = Action::MAINTAIN;
+        excepted_traj_ = StateList();
     } else {
         std::pair<Action, StateList> act_and_traj = planner.planning(*this);
-        cur_action = act_and_traj.first;
-        excepted_traj = act_and_traj.second;
+        cur_action_ = act_and_traj.first;
+        excepted_traj_ = act_and_traj.second;
         auto cmd = Node::enable_frenet_simulation
-                       ? utils::new_get_action_value(state, *target_line_converter,
-                                                     kDefaultWheelBase, cur_action)
-                       : utils::get_action_value(cur_action);
-        state = utils::kinematic_propagate(state, cmd, dt, Node::enable_frenet_simulation);
-        footprint.push_back(state);
+                       ? utils::new_get_action_value(state, *target_line_converter_,
+                                                     kDefaultWheelBase, cur_action_)
+                       : utils::get_action_value(cur_action_);
+        state = utils::kinematic_propagate(state, cmd, dt_, Node::enable_frenet_simulation);
+        footprint_.push_back(state);
     }
 }
 
 void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
                            bool fill_mode /* = false */) {
     if (draw_style == "realistic" && imshow_func != nullptr) {
-        imshow(outlook, state, {length, width});
+        imshow(outlook_, state, {agent_param_.length, agent_param_.width});
     } else {
         Eigen::Matrix<double, 2, 2, Eigen::RowMajor> head;
         Eigen::Matrix2d rot;
@@ -175,13 +175,13 @@ void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
     }
 
     // target refline
-    if (target_line_converter) {
+    if (target_line_converter_) {
         std::vector<double> xs, ys;
-        xs.reserve(target_line_converter->refline().size()),
-            ys.reserve(target_line_converter->refline().size());
-        for (const auto& p : target_line_converter->refline()) {
-           xs.emplace_back(p.x);
-           ys.emplace_back(p.y);
+        xs.reserve(target_line_converter_->refline().size()),
+            ys.reserve(target_line_converter_->refline().size());
+        for (const auto& p : target_line_converter_->refline()) {
+            xs.emplace_back(p.x);
+            ys.emplace_back(p.y);
         }
         plt::plot(xs, ys, "k--");
     }
@@ -248,10 +248,10 @@ void VehicleList::set_track_objects(void) {
             if (j != i) {
                 TrackedObject track_object(vehicle_list[j]->name);
                 track_object.state = vehicle_list[j]->state;
-                track_object.target = vehicle_list[j]->target;
-                track_object.target_line_converter = vehicle_list[j]->target_line_converter;
+                track_object.target_ = vehicle_list[j]->target_;
+                track_object.target_line_converter_ = vehicle_list[j]->target_line_converter_;
                 track_object.agent_param = vehicle_list[j]->agent_param_;
-                vehicle_list[i]->tracked_objects.emplace_back(track_object);
+                vehicle_list[i]->tracked_objects_.emplace_back(track_object);
             }
         }
     }
@@ -259,7 +259,7 @@ void VehicleList::set_track_objects(void) {
 
 void VehicleList::update_track_objects(void) {
     for (std::shared_ptr<Vehicle>& vehicle : vehicle_list) {
-        for (TrackedObject& object : vehicle->tracked_objects) {
+        for (TrackedObject& object : vehicle->tracked_objects_) {
             object.state = (*this)[object.name]->state;
         }
     }
