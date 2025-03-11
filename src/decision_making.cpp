@@ -68,7 +68,7 @@ void run(int rounds_num,
     }
 
     std::shared_ptr<EnvCrossroads> env = std::make_shared<EnvCrossroads>(map_size, lane_width);
-    VehicleBase::initialize(env, 5, 2, 8, 2.4);
+    AgentBase::initialize(env);
     MonteCarloTreeSearch::initialize(config);
     Node::initialize(config["max_step"].as<int>(), MonteCarloTreeSearch::calc_cur_value,
                      is_enable_frenet_simulation);
@@ -80,7 +80,12 @@ void run(int rounds_num,
         for (const auto& p : yaml_node.second["refline"]) {
             refline.emplace_back(Point(p["x"].as<double>(), p["y"].as<double>()));
         }
-        std::shared_ptr<Vehicle> vehicle = std::make_shared<Vehicle>(vehicle_name, config, refline);
+        AgentParam agent_param(yaml_node.second["param"]["len"].as<double>(),
+                               yaml_node.second["param"]["width"].as<double>(),
+                               yaml_node.second["param"]["safe_len"].as<double>(),
+                               yaml_node.second["param"]["safe_width"].as<double>());
+        std::shared_ptr<Vehicle> vehicle =
+            std::make_shared<Vehicle>(vehicle_name, config, refline, agent_param);
         vehicles.push_back(vehicle);
     }
     if (vehicles.size() < 1) {

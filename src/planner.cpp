@@ -43,22 +43,25 @@ double MonteCarloTreeSearch::calc_cur_value(std::shared_ptr<Node> node, double l
     double yaw = node->state.yaw;
     double velocity = node->state.v;
     int step = node->cur_level;
-    Eigen::Matrix<double, 2, 5> ego_box2d = VehicleBase::get_box2d(node->state);
-    Eigen::Matrix<double, 2, 5> ego_safezone = VehicleBase::get_safezone(node->state);
+    Eigen::Matrix<double, 2, 5> ego_box2d = AgentBase::get_box2d(node->state, node->agent_param);
+    Eigen::Matrix<double, 2, 5> ego_safezone =
+        AgentBase::get_safezone(node->state, node->agent_param);
 
     int avoid = 0;
     int safe = 0;
     for (auto& cur_other_state : node->other_agent_state) {
-        if (utils::has_overlap(ego_box2d, VehicleBase::get_box2d(cur_other_state))) {
+        if (utils::has_overlap(ego_box2d,
+                               AgentBase::get_box2d(cur_other_state, node->agent_param))) {
             avoid = -1;
         }
-        if (utils::has_overlap(ego_safezone, VehicleBase::get_safezone(cur_other_state))) {
+        if (utils::has_overlap(ego_safezone,
+                               AgentBase::get_safezone(cur_other_state, node->agent_param))) {
             safe = -1;
         }
     }
 
     int offroad = 0;
-    for (auto& rect : VehicleBase::env->rect_mat) {
+    for (auto& rect : AgentBase::env->rect_mat) {
         if (utils::has_overlap(ego_box2d, rect)) {
             offroad = -1;
             break;
@@ -92,13 +95,13 @@ bool MonteCarloTreeSearch::is_opposite_direction(State pos, Eigen::MatrixXd ego_
     double y = pos.y;
     double yaw = pos.yaw;
 
-    for (auto laneline : VehicleBase::env->laneline_mat) {
+    for (auto laneline : AgentBase::env->laneline_mat) {
         if (utils::has_overlap(ego_box2d, laneline)) {
             return true;
         }
     }
 
-    double lanewidth = VehicleBase::env->lanewidth;
+    double lanewidth = AgentBase::env->lanewidth;
     if (x > -lanewidth && x < 0 && (y < -lanewidth || y > lanewidth)) {
         // down lane
         if (yaw > 0 && yaw < M_PI) {
@@ -239,13 +242,14 @@ void MonteCarloTreeSearch::update(std::shared_ptr<Node> node, double r) {
     }
 }
 
-std::pair<Action, StateList> KLevelPlanner::planning(VehicleBase& ego) const {
-    std::vector<VehicleBase> others;
+std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
+    std::vector<AgentBase> others;
     for (const TrackedObject& obj : ego.tracked_objects) {
-        VehicleBase other(obj.name, obj.target_line_converter->refline());
+        AgentBase other(obj.name, obj.target_line_converter->refline(), obj.agent_param);
         other.state = obj.state;
         other.target = obj.target;
         other.have_got_target = other.is_get_target();
+        other.agent_param_ = obj.agent_param;
         others.emplace_back(other);
     }
 
@@ -263,11 +267,11 @@ std::pair<Action, StateList> KLevelPlanner::planning(VehicleBase& ego) const {
 }
 
 std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
-    const VehicleBase& ego, const std::vector<StateList>& traj) const {
+    const AgentBase& ego, const std::vector<StateList>& traj) const {
     MonteCarloTreeSearch mcts(traj, config);
     std::shared_ptr<Node> current_node =
         std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target,
-                               ego.target_line_converter);
+                               ego.target_line_converter, ego.agent_param_);
     current_node = mcts.excute(current_node);
     for (int i = 0; i < Node::MAX_LEVEL - 1; ++i) {
         current_node = mcts.get_best_child(current_node, 0);
@@ -291,12 +295,12 @@ std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
     return std::make_pair(actions, expected_traj);
 }
 
-std::vector<StateList> KLevelPlanner::get_prediction(const VehicleBase& ego,
-                                                     const std::vector<VehicleBase>& others) const {
+std::vector<StateList> KLevelPlanner::get_prediction(const AgentBase& ego,
+                                                     const std::vector<AgentBase>& others) const {
     std::vector<StateList> pred_trajectory;
 
     if (ego.level == 0) {
-        for (const VehicleBase& other : others) {
+        for (const AgentBase& other : others) {
             StateList pred_traj;
             for (size_t i = 0; i < steps + 1; ++i) {
                 pred_traj.push_back(other.state);
@@ -313,9 +317,9 @@ std::vector<StateList> KLevelPlanner::get_prediction(const VehicleBase& ego,
                 pred_trajectory.emplace_back(pred_traj);
                 continue;
             }
-            VehicleBase exchanged_ego = others[idx];
+            AgentBase exchanged_ego = others[idx];
             exchanged_ego.level = ego.level - 1;
-            std::vector<VehicleBase> exchanged_others = {ego};
+            std::vector<AgentBase> exchanged_others = {ego};
             for (size_t i = 0; i < others.size(); ++i) {
                 if (i != idx) {
                     exchanged_others.push_back(others[i]);

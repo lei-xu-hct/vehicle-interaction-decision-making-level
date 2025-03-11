@@ -15,7 +15,7 @@ from matplotlib.transforms import Affine2D
 from typing import Tuple, List, Union, Optional
 
 import utils
-from vehicle_base import VehicleBase
+from vehicle_base import AgentBase
 from planner import KLevelPlanner
 
 current_dir_path = os.path.dirname(os.path.abspath(__file__))
@@ -30,13 +30,13 @@ vehicle_show_config = [
     ["#000000", f"{current_dir_path}/../img/vehicle/black.png"],
 ]
 
-class Vehicle(VehicleBase):
+class Vehicle(AgentBase):
     global_vehicle_idx = 0
 
     def __init__(self, name, cfg: dict = {}) -> None:
         super().__init__(name)
-        self.vehicle_box2d: np.ndarray = VehicleBase.get_box2d(self.state)
-        self.safezone: np.ndarray = VehicleBase.get_safezone(self.state)
+        self.vehicle_box2d: np.ndarray = AgentBase.get_box2d(self.state)
+        self.safezone: np.ndarray = AgentBase.get_safezone(self.state)
         self.target: utils.State = utils.State(0, 0, 0, 0)
         self.have_got_target: bool = False
         self.dt: float = cfg['delta_t']
@@ -90,7 +90,7 @@ class Vehicle(VehicleBase):
         else:
             logging.CRITICAL("set_target error, the target range must >= -25 and <= 25 !")
 
-    def excute(self, others: List[VehicleBase]) -> Tuple[utils.Action, utils.StateList]:
+    def excute(self, others: List[AgentBase]) -> Tuple[utils.Action, utils.StateList]:
         if self.is_get_target:
             self.have_got_target = True
             self.state.v = 0
@@ -116,14 +116,14 @@ class Vehicle(VehicleBase):
                        extent=image_extent, zorder=10.0, clip_on=True)
         else:
             head = np.array(
-                [[0.3 * VehicleBase.length, 0.3 * VehicleBase.length],
-                [VehicleBase.width/2, -VehicleBase.width/2]])
+                [[0.3 * AgentBase.length, 0.3 * AgentBase.length],
+                [AgentBase.width/2, -AgentBase.width/2]])
             rot = np.array([[np.cos(self.state.yaw), -np.sin(self.state.yaw)],
                             [np.sin(self.state.yaw), np.cos(self.state.yaw)]])
             head = np.dot(rot, head)
             head += np.array([[self.state.x], [self.state.y]])
 
-            self.vehicle_box2d = VehicleBase.get_box2d(self.state)
+            self.vehicle_box2d = AgentBase.get_box2d(self.state)
 
             if not fill_mode:
                 plt.plot(self.vehicle_box2d[0, :], self.vehicle_box2d[1, :], self.color)
@@ -155,8 +155,8 @@ class VehicleList:
         for i in range(len(self.vehicle_list) - 1):
             for j in range(i + 1, len(self.vehicle_list)):
                 if utils.has_overlap(
-                    VehicleBase.get_box2d(self.vehicle_list[i].state),
-                    VehicleBase.get_box2d(self.vehicle_list[j].state)):
+                    AgentBase.get_box2d(self.vehicle_list[i].state),
+                    AgentBase.get_box2d(self.vehicle_list[j].state)):
                     return True
 
         return False

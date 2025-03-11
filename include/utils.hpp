@@ -34,6 +34,21 @@ const std::vector<Action> ACTION_LIST = {
     Action::BRAKE        // (-5.0, 0)
 };
 
+struct AgentParam {
+    AgentParam() : length(1.0), width(1.0), safe_length(1.0), safe_width(1.0) {}
+
+    AgentParam(const double _len,
+               const double _width,
+               const double _safe_len,
+               const double _safe_width)
+        : length(_len), width(_width), safe_length(_safe_len), safe_width(_safe_width) {}
+
+    double length;
+    double width;
+    double safe_length;
+    double safe_width;
+};
+
 class Random {
   private:
     static std::default_random_engine engine;
@@ -211,6 +226,7 @@ class Node : public std::enable_shared_from_this<Node> {
     StateList other_agent_state;
 
     std::shared_ptr<XYSLConverter> xysl_converter{nullptr};
+    const AgentParam& agent_param;
 
     Node() = delete;
     Node(State _state,
@@ -219,7 +235,8 @@ class Node : public std::enable_shared_from_this<Node> {
          const Action& act,
          const StateList& others,
          const State& goal,
-         std::shared_ptr<XYSLConverter> converter);
+         std::shared_ptr<XYSLConverter> converter,
+         const AgentParam& param);
     ~Node() {}
 
     static void initialize(int max_level,

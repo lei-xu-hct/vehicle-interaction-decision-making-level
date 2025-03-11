@@ -33,8 +33,11 @@ const std::vector<std::pair<std::string, std::string>> vehicle_show_config = {
 int Vehicle::global_vehicle_idx = 0;
 PyObject* Vehicle::imshow_func = nullptr;
 
-Vehicle::Vehicle(std::string _name, const YAML::Node& cfg, const std::vector<Point>& refline)
-    : VehicleBase(_name, refline), planner(KLevelPlanner::get_instance(cfg)) {
+Vehicle::Vehicle(std::string _name,
+                 const YAML::Node& cfg,
+                 const std::vector<Point>& refline,
+                 const AgentParam& param)
+    : AgentBase(_name, refline, param), planner(KLevelPlanner::get_instance(cfg)) {
     YAML::Node vehicle_info = cfg["vehicle_list"][_name];
     level = vehicle_info["level"].as<int>();
     init_x_min = vehicle_info["init"]["x"]["min"].as<double>();
@@ -55,8 +58,8 @@ Vehicle::Vehicle(std::string _name, const YAML::Node& cfg, const std::vector<Poi
     std::string vehicle_pic_path = vehicle_show_config[local_loop_idx].second;
     outlook.data = utils::imread(vehicle_pic_path, outlook.rows, outlook.cols, outlook.colors);
 
-    vehicle_box2d = VehicleBase::get_box2d(state);
-    safezone = VehicleBase::get_safezone(state);
+    vehicle_box2d = AgentBase::get_box2d(state, agent_param_);
+    safezone = AgentBase::get_safezone(state, agent_param_);
     dt = cfg["delta_t"].as<double>();
 
     if (imshow_func == nullptr && Vehicle::global_vehicle_idx == 0) {
@@ -146,13 +149,13 @@ void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
     } else {
         Eigen::Matrix<double, 2, 2, Eigen::RowMajor> head;
         Eigen::Matrix2d rot;
-        head << 0.3 * VehicleBase::length, 0.3 * VehicleBase::length, VehicleBase::width / 2,
-            -VehicleBase::width / 2;
+        head << 0.3 * agent_param_.length, 0.3 * agent_param_.length, 0.5 * agent_param_.width,
+            -0.5 * agent_param_.width;
         rot << cos(state.yaw), -sin(state.yaw), sin(state.yaw), cos(state.yaw);
 
         head = rot * head;
         head += Eigen::Vector2d(state.x, state.y).replicate(1, 2);
-        vehicle_box2d = VehicleBase::get_box2d(state);
+        vehicle_box2d = AgentBase::get_box2d(state, agent_param_);
 
         std::vector<std::vector<double>> box2d_vec(2);
         std::vector<std::vector<double>> head_vec(2);
@@ -202,8 +205,10 @@ bool VehicleList::is_all_get_target(void) {
 bool VehicleList::is_any_collision(void) {
     for (int i = 0; i < vehicle_list.size() - 1; ++i) {
         for (int j = i + 1; j < vehicle_list.size(); ++j) {
-            if (utils::has_overlap(VehicleBase::get_box2d(vehicle_list[i]->state),
-                                   VehicleBase::get_box2d(vehicle_list[j]->state))) {
+            if (utils::has_overlap(
+                    AgentBase::get_box2d(vehicle_list[i]->state, vehicle_list[i]->agent_param_),
+                    AgentBase::get_box2d(vehicle_list[j]->state,
+                                           vehicle_list[j]->agent_param_))) {
                 return true;
             }
         }
@@ -245,6 +250,7 @@ void VehicleList::set_track_objects(void) {
                 track_object.state = vehicle_list[j]->state;
                 track_object.target = vehicle_list[j]->target;
                 track_object.target_line_converter = vehicle_list[j]->target_line_converter;
+                track_object.agent_param = vehicle_list[j]->agent_param_;
                 vehicle_list[i]->tracked_objects.emplace_back(track_object);
             }
         }
@@ -259,13 +265,13 @@ void VehicleList::update_track_objects(void) {
     }
 }
 
-std::vector<VehicleBase> VehicleList::exclude(int ego_idx) {
+std::vector<AgentBase> VehicleList::exclude(int ego_idx) {
     std::shared_ptr<Vehicle> ego_vehicle = vehicle_list[ego_idx];
     return exclude(ego_vehicle);
 }
 
-std::vector<VehicleBase> VehicleList::exclude(std::shared_ptr<Vehicle> ego) {
-    std::vector<VehicleBase> exclude_list;
+std::vector<AgentBase> VehicleList::exclude(std::shared_ptr<Vehicle> ego) {
+    std::vector<AgentBase> exclude_list;
     for (std::shared_ptr<Vehicle> vehicle : vehicle_list) {
         if (vehicle->name != ego->name) {
             exclude_list.push_back(*vehicle);

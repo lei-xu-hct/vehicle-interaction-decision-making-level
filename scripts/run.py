@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 from utils import Node, kinematic_propagate
 from env import EnvCrossroads
-from vehicle_base import VehicleBase
+from vehicle_base import AgentBase
 from vehicle import Vehicle, VehicleList
 from planner import MonteCarloTreeSearch
 
@@ -42,7 +42,7 @@ def run(rounds_num:int, config_path:str, save_path:str, no_animation:bool, save_
     vehicle_draw_style = config['vehicle_display_style']
 
     # initialize
-    VehicleBase.initialize(env, 5, 2, 8, 2.4)
+    AgentBase.initialize(env, 5, 2, 8, 2.4)
     MonteCarloTreeSearch.initialize(config)
     Node.initialize(config['max_step'], MonteCarloTreeSearch.calc_cur_value)
     

@@ -14,7 +14,7 @@ from typing import Tuple, List
 
 import utils
 from utils import Node, StateList
-from vehicle_base import VehicleBase
+from vehicle_base import AgentBase
 
 
 class MonteCarloTreeSearch:
@@ -27,10 +27,10 @@ class MonteCarloTreeSearch:
     WEIGHT_DISTANCE = 0.1
     WEIGHT_VELOCITY = 0.05
 
-    def __init__(self, ego: VehicleBase, others: List[VehicleBase],
+    def __init__(self, ego: AgentBase, others: List[AgentBase],
                  other_traj: List[StateList], cfg: dict = {}):
-        self.ego_vehicle: VehicleBase = ego
-        self.other_vehicle: VehicleBase = others
+        self.ego_vehicle: AgentBase = ego
+        self.other_vehicle: AgentBase = others
         self.other_predict_traj: StateList = other_traj
 
         self.computation_budget = cfg['computation_budget']
@@ -108,19 +108,19 @@ class MonteCarloTreeSearch:
     def calc_cur_value(node: Node, last_node_value: float) -> float:
         x, y, yaw = node.state.x, node.state.y, node.state.yaw
         step = node.cur_level
-        ego_box2d = VehicleBase.get_box2d(node.state)
-        ego_safezone = VehicleBase.get_safezone(node.state)
+        ego_box2d = AgentBase.get_box2d(node.state)
+        ego_safezone = AgentBase.get_safezone(node.state)
 
         avoid = 0
         safe = 0
         for cur_other_state in node.other_agent_state:
-            if utils.has_overlap(ego_box2d, VehicleBase.get_box2d(cur_other_state)):
+            if utils.has_overlap(ego_box2d, AgentBase.get_box2d(cur_other_state)):
                 avoid = -1
-            if utils.has_overlap(ego_safezone, VehicleBase.get_safezone(cur_other_state)):
+            if utils.has_overlap(ego_safezone, AgentBase.get_safezone(cur_other_state)):
                 safe = -1
 
         offroad = 0
-        for rect in VehicleBase.env.rect:
+        for rect in AgentBase.env.rect:
             if utils.has_overlap(ego_box2d, rect):
                 offroad = -1
                 break
@@ -149,13 +149,13 @@ class MonteCarloTreeSearch:
     def is_opposite_direction(pos: utils.State, ego_box2d = None) -> bool:
         x, y, yaw = pos.x, pos.y, pos.yaw
         if ego_box2d is None:
-            ego_box2d = VehicleBase.get_box2d(pos)
+            ego_box2d = AgentBase.get_box2d(pos)
 
-        for laneline in VehicleBase.env.laneline:
+        for laneline in AgentBase.env.laneline:
             if utils.has_overlap(ego_box2d, laneline):
                 return True
 
-        lanewidth = VehicleBase.env.lanewidth
+        lanewidth = AgentBase.env.lanewidth
 
         # down lane
         if x > -lanewidth and x < 0 and (y < -lanewidth or y > lanewidth):
@@ -193,13 +193,13 @@ class KLevelPlanner:
         self.dt = cfg['delta_t']
         self.config = cfg
 
-    def planning(self, ego: VehicleBase, others: List[VehicleBase]) -> Tuple[utils.Action, StateList]:
+    def planning(self, ego: AgentBase, others: List[AgentBase]) -> Tuple[utils.Action, StateList]:
         other_prediction = self.get_prediction(ego, others)
         actions, traj = self.forward_simulate(ego, others, other_prediction)
 
         return actions[0], traj
 
-    def forward_simulate(self, ego: VehicleBase, others: List[VehicleBase],
+    def forward_simulate(self, ego: AgentBase, others: List[AgentBase],
                          traj: List[StateList]) -> Tuple[List[utils.Action], StateList]:
         mcts = MonteCarloTreeSearch(ego, others, traj, self.config)
         current_node = Node(state = ego.state, goal = ego.target)
@@ -221,7 +221,7 @@ class KLevelPlanner:
 
         return actions, expected_traj
 
-    def get_prediction(self, ego: VehicleBase, others: List[VehicleBase]) -> List[StateList]:
+    def get_prediction(self, ego: AgentBase, others: List[AgentBase]) -> List[StateList]:
         pred_trajectory = []
         pred_trajectory_trans = []
 
@@ -240,9 +240,9 @@ class KLevelPlanner:
                         pred_traj.append(others[idx].state)
                     pred_trajectory_trans.append(pred_traj)
                     continue
-                exchanged_ego: VehicleBase = others[idx]
+                exchanged_ego: AgentBase = others[idx]
                 exchanged_ego.level = ego.level - 1
-                exchanged_others: List[VehicleBase] = [ego]
+                exchanged_others: List[AgentBase] = [ego]
                 for i in range(len(others)):
                     if i != idx:
                         exchanged_others.append(others[i])

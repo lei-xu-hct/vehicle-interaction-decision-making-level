@@ -29,6 +29,8 @@ class TrackedObject {
 
     std::shared_ptr<XYSLConverter> target_line_converter;
 
+    AgentParam agent_param;
+
     TrackedObject() : name("") {
         state = State(0, 0, 0, 0);
         predict_trajs.clear();

@@ -41,14 +41,16 @@ Node::Node(State _state,
            const Action& act,
            const StateList& others,
            const State& goal,
-           std::shared_ptr<XYSLConverter> converter)
+           std::shared_ptr<XYSLConverter> converter,
+           const AgentParam& param)
     : state(_state),
       cur_level(_level),
       parent(p),
       action(act),
       other_agent_state(others),
       goal_pose(goal),
-      xysl_converter(converter) {
+      xysl_converter(converter),
+      agent_param(param) {
     value = 0.0;
     reward = 0.0;
     visits = 0;
@@ -70,7 +72,7 @@ std::shared_ptr<Node> Node::add_child(const Action& next_action,
 
     std::shared_ptr<Node> child =
         std::make_shared<Node>(new_state, cur_level + 1, shared_from_this(), next_action, others,
-                               goal_pose, xysl_converter);
+                               goal_pose, xysl_converter, agent_param);
     child->actions = actions;
     child->actions.push_back(next_action);
     if (Node::calc_value_callback) {
@@ -94,8 +96,9 @@ std::shared_ptr<Node> Node::next_node(double delta_t, StateList others) {
     State new_state =
         utils::kinematic_propagate(state, cmd, delta_t, Node::enable_frenet_simulation);
 
-    std::shared_ptr<Node> node = std::make_shared<Node>(
-        new_state, cur_level + 1, nullptr, next_action, others, goal_pose, xysl_converter);
+    std::shared_ptr<Node> node =
+        std::make_shared<Node>(new_state, cur_level + 1, nullptr, next_action, others, goal_pose,
+                               xysl_converter, agent_param);
     if (Node::calc_value_callback) {
         Node::calc_value_callback(node, value);
     } else {

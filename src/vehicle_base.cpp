@@ -10,13 +10,13 @@
 
 #include "vehicle_base.hpp"
 
-double VehicleBase::length = 5;
-double VehicleBase::width = 2;
-double VehicleBase::safe_length = 8;
-double VehicleBase::safe_width = 2.4;
-std::shared_ptr<EnvCrossroads> VehicleBase::env = nullptr;
+double AgentBase::length = 5;
+double AgentBase::width = 2;
+double AgentBase::safe_length = 8;
+double AgentBase::safe_width = 2.4;
+std::shared_ptr<EnvCrossroads> AgentBase::env = nullptr;
 
-void VehicleBase::set_target(State tar) {
+void AgentBase::set_target(State tar) {
     if (tar.x >= -25 && tar.x <= 25 && tar.y >= -25 && tar.y <= 25) {
         target = tar;
     } else {
@@ -24,7 +24,7 @@ void VehicleBase::set_target(State tar) {
     }
 }
 
-void VehicleBase::set_level(int l) {
+void AgentBase::set_level(int l) {
     if (l >= 0 && l < 3) {
         level = l;
     } else {
@@ -32,6 +32,6 @@ void VehicleBase::set_level(int l) {
     }
 }
 
-bool VehicleBase::is_get_target(void) const {
+bool AgentBase::is_get_target(void) const {
     return have_got_target || hypot(state.x - target.x, state.y - target.y) < 1.7;
 }

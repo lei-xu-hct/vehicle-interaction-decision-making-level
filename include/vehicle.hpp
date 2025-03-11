@@ -19,7 +19,7 @@
 #include "vehicle_base.hpp"
 #include "planner.hpp"
 
-class Vehicle : public VehicleBase {
+class Vehicle : public AgentBase {
   private:
     double dt;
     KLevelPlanner& planner;
@@ -51,7 +51,10 @@ class Vehicle : public VehicleBase {
     Eigen::Matrix<double, 2, 5, Eigen::RowMajor> safezone;
     State vis_text_pos;
 
-    Vehicle(std::string _name, const YAML::Node& cfg, const std::vector<Point>& refline);
+    Vehicle(std::string _name,
+            const YAML::Node& cfg,
+            const std::vector<Point>& refline,
+            const AgentParam& param);
     ~Vehicle() {}
 
     void reset(void);
@@ -82,8 +85,8 @@ class VehicleList {
     void reset(void);
     void set_track_objects(void);
     void update_track_objects(void);
-    std::vector<VehicleBase> exclude(int ego_idx);
-    std::vector<VehicleBase> exclude(std::shared_ptr<Vehicle> ego);
+    std::vector<AgentBase> exclude(int ego_idx);
+    std::vector<AgentBase> exclude(std::shared_ptr<Vehicle> ego);
     std::shared_ptr<Vehicle> operator[](size_t index) { return vehicle_list[index]; }
     std::shared_ptr<Vehicle> operator[](std::string name);
     auto begin() { return vehicle_list.begin(); }

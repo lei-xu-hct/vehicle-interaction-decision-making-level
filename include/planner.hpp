@@ -75,9 +75,9 @@ class KLevelPlanner {
         return planner_;
     }
 
-    std::pair<Action, StateList> planning(VehicleBase& ego) const;
+    std::pair<Action, StateList> planning(AgentBase& ego) const;
     std::pair<std::vector<Action>, StateList> forward_simulate(
-        const VehicleBase& ego, const std::vector<StateList>& traj) const;
-    std::vector<StateList> get_prediction(const VehicleBase& ego,
-                                          const std::vector<VehicleBase>& others) const;
+        const AgentBase& ego, const std::vector<StateList>& traj) const;
+    std::vector<StateList> get_prediction(const AgentBase& ego,
+                                          const std::vector<AgentBase>& others) const;
 };
