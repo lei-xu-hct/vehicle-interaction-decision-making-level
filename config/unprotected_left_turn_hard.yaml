@@ -4,7 +4,7 @@ max_simulation_time: 20
 
 # environment
 map_size: 25
-lane_width: 4
+lane_width: 4.5
 
 # mcts parameters
 computation_budget: 1000
@@ -20,7 +20,7 @@ weight_velocity: 0.03
 # realistic or linestyle
 vehicle_display_style: "linestyle"
 is_show_predict_traj: true
-is_enable_frenet_simulation: false
+is_enable_frenet_simulation: true
 ego_vehicle: "vehilce_0"
 
 vehicle_list:
@@ -102,36 +102,36 @@ vehicle_list:
     level: 0
     init:
       x:
-        min: -2
-        max: -2
+        min: -8
+        max: -9
       y:
-        min: 18
-        max: 24
-      yaw: -1.5707963
+        min: -2
+        max: -3
+      yaw: 0
       v:
-        min: 5
-        max: 6
+        min: 0
+        max: 5
     target:
-      x: -2
-      y: -24
-      yaw: -1.5707963
+      x: 1.5
+      y: 15
+      yaw: 1.5707963
     text:
       x: 15
       y: 20
     refline:
-      - x: -2
-        y: 25
-      - x: -2
-        y: 0
-      - x: -2
+      - x: -15
+        y: -2
+      - x: 0
+        y: -2
+      - x: 2
         y: 2
-      - x: -2
-        y: -20
-      - x: -2
-        y: -40
+      - x: 2
+        y: 10
+      - x: 2
+        y: 25
     param:
-      len: 5.0
-      width: 2.0
-      safe_len: 8.0
-      safe_width: 2.4
+      len: 2.0
+      width: 1.2
+      safe_len: 3.0
+      safe_width: 2.0
 

@@ -244,12 +244,12 @@ void MonteCarloTreeSearch::update(std::shared_ptr<Node> node, double r) {
 
 std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
     std::vector<AgentBase> others;
-    for (const TrackedObject& obj : ego.tracked_objects_) {
-        AgentBase other(obj.name, obj.target_line_converter_->refline(), obj.agent_param);
-        other.state = obj.state;
-        other.target_ = obj.target_;
-        other.have_got_target_ = other.is_get_target();
-        other.agent_param_ = obj.agent_param;
+    for (const TrackedObject& obj : ego.tracked_objects()) {
+        AgentBase other(obj.name(), obj.target_line_converter()->refline(), obj.agent_param());
+        other.mutable_state() = obj.state();
+        other.mutable_target() = obj.target();
+        other.mutable_have_got_target() = other.is_get_target();
+        other.agent_param_ = obj.agent_param();
         others.emplace_back(other);
     }
 
@@ -257,8 +257,8 @@ std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
 
     for (size_t i = 0; i < others.size(); ++i) {
         PredictTraj predict_traj{1.0, other_prediction[i]};
-        ego.tracked_objects_[i].predict_trajs.clear();
-        ego.tracked_objects_[i].predict_trajs.emplace_back(predict_traj);
+        ego.mutable_tracked_objects()[i].mutable_predict_trajs().clear();
+        ego.mutable_tracked_objects()[i].mutable_predict_trajs().emplace_back(predict_traj);
     }
 
     std::pair<std::vector<Action>, StateList> ret = forward_simulate(ego, other_prediction);
@@ -268,10 +268,10 @@ std::pair<Action, StateList> KLevelPlanner::planning(AgentBase& ego) const {
 
 std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
     const AgentBase& ego, const std::vector<StateList>& traj) const {
-    MonteCarloTreeSearch mcts(traj, config);
+    MonteCarloTreeSearch mcts(traj, config_);
     std::shared_ptr<Node> current_node =
-        std::make_shared<Node>(ego.state, 0, nullptr, Action::MAINTAIN, StateList(), ego.target_,
-                               ego.target_line_converter_, ego.agent_param_);
+        std::make_shared<Node>(ego.state(), 0, nullptr, Action::MAINTAIN, StateList(), ego.target(),
+                               ego.target_line_converter(), ego.agent_param_);
     current_node = mcts.excute(current_node);
     for (int i = 0; i < Node::MAX_LEVEL - 1; ++i) {
         current_node = mcts.get_best_child(current_node, 0);
@@ -285,11 +285,11 @@ std::pair<std::vector<Action>, StateList> KLevelPlanner::forward_simulate(
     }
     expected_traj.reverse();
 
-    if (expected_traj.size() < steps + 1) {
+    if (expected_traj.size() < steps_ + 1) {
         spdlog::debug(
             "The max level of the node is not enough({}),using the last value to complete it.",
             expected_traj.size());
-        expected_traj.expand(steps + 1);
+        expected_traj.expand(steps_ + 1);
     }
 
     return std::make_pair(actions, expected_traj);
@@ -299,26 +299,26 @@ std::vector<StateList> KLevelPlanner::get_prediction(const AgentBase& ego,
                                                      const std::vector<AgentBase>& others) const {
     std::vector<StateList> pred_trajectory;
 
-    if (ego.level_ == 0) {
+    if (ego.level() == 0) {
         for (const AgentBase& other : others) {
             StateList pred_traj;
-            for (size_t i = 0; i < steps + 1; ++i) {
-                pred_traj.push_back(other.state);
+            for (size_t i = 0; i < steps_ + 1; ++i) {
+                pred_traj.push_back(other.state());
             }
             pred_trajectory.emplace_back(pred_traj);
         }
-    } else if (ego.level_ > 0) {
+    } else if (ego.level() > 0) {
         for (size_t idx = 0; idx < others.size(); ++idx) {
-            if (others[idx].have_got_target_) {
+            if (others[idx].have_got_target()) {
                 StateList pred_traj;
-                for (size_t i = 0; i < steps + 1; ++i) {
-                    pred_traj.push_back(others[idx].state);
+                for (size_t i = 0; i < steps_ + 1; ++i) {
+                    pred_traj.push_back(others[idx].state());
                 }
                 pred_trajectory.emplace_back(pred_traj);
                 continue;
             }
             AgentBase exchanged_ego = others[idx];
-            exchanged_ego.level_ = ego.level_ - 1;
+            exchanged_ego.mutable_level() = ego.level() - 1;
             std::vector<AgentBase> exchanged_others = {ego};
             for (size_t i = 0; i < others.size(); ++i) {
                 if (i != idx) {

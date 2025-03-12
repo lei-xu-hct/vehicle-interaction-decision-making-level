@@ -9,11 +9,26 @@
 #include <cmath>
 #include <array>
 #include <fstream>
+#include <numeric>
 #include <unordered_map>
 
 #include <spdlog/spdlog.h>
 
 #include "utils.hpp"
+
+constexpr bool kEnableHybridCtrl = true;
+constexpr double kLinerInterSpeedLower = 1.5;      // m/s
+constexpr double kLinerInterSpeedUpper = 20.0;     // m/s
+constexpr double kLinerInterSteerMax = 35 / 57.3;  // rad
+constexpr double kLinerInterSteerMin = 2 / 57.3;   // rad
+
+template <typename T>
+T linearInterpolate(T x0, T y0, T x1, T y1, T x) {
+    if (std::fabs(x0 - x1) < std::numeric_limits<T>::epsilon()) {
+        return 0.0;
+    }
+    return y0 + (y1 - y0) * ((x - x0) / (x1 - x0));
+}
 
 int Node::MAX_LEVEL = 6;
 // double (*Node::calc_value_callback)(std::shared_ptr<Node>, double) = nullptr;
@@ -114,6 +129,7 @@ constexpr double kMaxFrontWheelAngle = 35.0 / 57.3;
 constexpr double kSteerControlGain = 1.5;
 constexpr double kMaxLookaheadDist = 50.0;
 constexpr double kMinLookaheadDist = 3.0;
+constexpr double kMinLookBackDist = 2.0;
 
 void FindGoalPoint(const State& vehicle,
                    const XYSLConverter& refline,
@@ -137,7 +153,7 @@ void FindGoalPoint(const State& vehicle,
         vehicle.v * refline_dir_val > 0.0
             ? std::min(std::max(kMinLookaheadDist, vehicle.v * kSteerControlGain),
                        kMaxLookaheadDist)
-            : -kMinLookaheadDist;
+            : -kMinLookBackDist;
 
     // 2、SLTOXY
     double goal_s = vehicle_s + look_ahead_dist;
@@ -172,6 +188,7 @@ Eigen::Vector2d new_get_action_value(const State& vehicle,
                                      const double wheelbase,
                                      const Action& act) {
     // 通过refline的偏移角度来计算action的值
+    // 改成混合控制, turn left & right采用 steer转角输出
     static double kLatOffset = 0.3;
     static std::unordered_map<Action, Eigen::Vector2d> NEW_ACTION_MAP = {
         {Action::MAINTAIN, {0, 0}},
@@ -180,13 +197,20 @@ Eigen::Vector2d new_get_action_value(const State& vehicle,
         {Action::ACCELERATE, {2.0, 0}},
         {Action::DECELERATE, {-2.5, 0}},
         {Action::BRAKE, {-5, 0}}};
-
-    State goal;
     Eigen::Vector2d ctrl = NEW_ACTION_MAP[act];
-    FindGoalPoint(vehicle, refline, ctrl[1], goal);
 
-    double steer = PurePursuit(wheelbase, vehicle, goal);
-    ctrl[1] = steer;
+    if (kEnableHybridCtrl && (act == Action::TURNLEFT || act == Action::TURNRIGHT)) {
+        ctrl[1] =
+            (act == Action::TURNLEFT ? 1 : -1) *
+            linearInterpolate(kLinerInterSpeedLower, kLinerInterSteerMax, kLinerInterSpeedUpper,
+                              kLinerInterSteerMin, std::fabs(vehicle.v));
+    } else {
+        State goal;
+        FindGoalPoint(vehicle, refline, ctrl[1], goal);
+
+        double steer = PurePursuit(wheelbase, vehicle, goal);
+        ctrl[1] = steer;
+    }
 
     return ctrl;
 }

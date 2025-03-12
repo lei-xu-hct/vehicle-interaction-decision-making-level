@@ -103,7 +103,7 @@ void run(int rounds_num,
             spdlog::info(
                 "{} >>> init_x: {:.2f}, init_y: {:.2f}, init_v: {:.2f}, len: {:.1f}, width: "
                 "{:.1f}, safe_len: {:.1f}, safe_width: {:.1f}",
-                vehicle->name, vehicle->state.x, vehicle->state.y, vehicle->state.v,
+                vehicle->name(), vehicle->state().x, vehicle->state().y, vehicle->state().v,
                 vehicle->agent_param_.length, vehicle->agent_param_.width,
                 vehicle->agent_param_.safe_length, vehicle->agent_param_.safe_width);
         }
@@ -147,30 +147,30 @@ void run(int rounds_num,
                 plt::cla();
                 env->draw_env();
                 for (const std::shared_ptr<Vehicle>& vehicle : vehicles) {
-                    auto excepted_traj = vehicle->excepted_traj_.to_vector();
+                    auto excepted_traj = vehicle->excepted_traj().to_vector();
                     vehicle->draw_vehicle(vehicle_draw_style);
-                    plt::plot({vehicle->target_.x}, {vehicle->target_.y},
+                    plt::plot({vehicle->target().x}, {vehicle->target().y},
                               {{"marker", "x"}, {"color", vehicle->color}});
                     plt::plot(excepted_traj[0], excepted_traj[1],
                               {{"color", vehicle->color}, {"linewidth", "1"}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y + 3,
-                              fmt::format("level {:d}", vehicle->level_),
+                              fmt::format("level {:d}", vehicle->level()),
                               {{"color", vehicle->color}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y,
-                              fmt::format("v = {:.2f} m/s", vehicle->state.v),
+                              fmt::format("v = {:.2f} m/s", vehicle->state().v),
                               {{"color", vehicle->color}});
                     plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y - 3,
-                              fmt::format("{}", utils::get_action_name(vehicle->cur_action_)),
+                              fmt::format("{}", utils::get_action_name(vehicle->cur_action())),
                               {{"color", vehicle->color}});
                 }
                 if (is_show_predict_traj) {
                     if (ego_vehicle_name.empty()) {
-                        ego_vehicle_name = vehicles[0]->name;
+                        ego_vehicle_name = vehicles[0]->name();
                         spdlog::warn("ego_vehicle parameter in yaml is none, defualt: " +
                                      ego_vehicle_name);
                     }
-                    for (const TrackedObject& obj : vehicles[ego_vehicle_name]->tracked_objects_) {
-                        for (const PredictTraj& predict_traj : obj.predict_trajs) {
+                    for (const TrackedObject& obj : vehicles[ego_vehicle_name]->tracked_objects()) {
+                        for (const PredictTraj& predict_traj : obj.predict_trajs()) {
                             double belief = predict_traj.confidence;
                             std::vector<std::vector<double>> prediction =
                                 predict_traj.traj.to_vector();
@@ -194,12 +194,12 @@ void run(int rounds_num,
             plt::clf();
             env->draw_env();
             for (std::shared_ptr<Vehicle>& vehicle : vehicles) {
-                for (const State& state : vehicle->footprint_) {
-                    vehicle->state = state;
+                for (const State& state : vehicle->footprint()) {
+                    vehicle->mutable_state() = state;
                     vehicle->draw_vehicle(vehicle_draw_style, true);
                 }
                 plt::text(vehicle->vis_text_pos.x, vehicle->vis_text_pos.y + 3,
-                          fmt::format("level {:d}", vehicle->level_), {{"color", vehicle->color}});
+                          fmt::format("level {:d}", vehicle->level()), {{"color", vehicle->color}});
             }
             plt::xlim(-map_size, map_size);
             plt::ylim(-map_size, map_size);
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
 
     int rounds_num = 5;
     std::filesystem::path output_path = project_path / "logs";
-    std::filesystem::path config_path = project_path / "config" / "unprotected_left_turn.yaml";
+    std::filesystem::path config_path = project_path / "config" / "unprotected_left_turn_hard.yaml";
     bool show_animation = true;
     bool save_flag = false;
     std::string log_level = "info";  // info

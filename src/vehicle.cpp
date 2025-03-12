@@ -33,12 +33,12 @@ const std::vector<std::pair<std::string, std::string>> vehicle_show_config = {
 int Vehicle::global_vehicle_idx = 0;
 PyObject* Vehicle::imshow_func = nullptr;
 
-Vehicle::Vehicle(std::string _name,
+Vehicle::Vehicle(std::string name,
                  const YAML::Node& cfg,
                  const std::vector<Point>& refline,
                  const AgentParam& param)
-    : AgentBase(_name, refline, param), planner(KLevelPlanner::get_instance(cfg)) {
-    YAML::Node vehicle_info = cfg["vehicle_list"][_name];
+    : AgentBase(name, refline, param), planner_(KLevelPlanner::get_instance(cfg)) {
+    YAML::Node vehicle_info = cfg["vehicle_list"][name];
     level_ = vehicle_info["level"].as<int>();
     init_x_min = vehicle_info["init"]["x"]["min"].as<double>();
     init_x_max = vehicle_info["init"]["x"]["max"].as<double>();
@@ -58,8 +58,8 @@ Vehicle::Vehicle(std::string _name,
     std::string vehicle_pic_path = vehicle_show_config[local_loop_idx].second;
     outlook_.data = utils::imread(vehicle_pic_path, outlook_.rows, outlook_.cols, outlook_.colors);
 
-    vehicle_box2d = AgentBase::get_box2d(state, agent_param_);
-    safezone = AgentBase::get_safezone(state, agent_param_);
+    vehicle_box2d_ = AgentBase::get_box2d(state_, agent_param_);
+    safezone_ = AgentBase::get_safezone(state_, agent_param_);
     dt_ = cfg["delta_t"].as<double>();
 
     if (imshow_func == nullptr && Vehicle::global_vehicle_idx == 0) {
@@ -116,53 +116,53 @@ void Vehicle::reset(void) {
     excepted_traj_ = StateList();
     have_got_target_ = false;
 
-    state.x = Random::uniform(init_x_min, init_x_max);
-    state.y = Random::uniform(init_y_min, init_y_max);
-    state.v = Random::uniform(init_v_min, init_v_max);
-    state.yaw = init_yaw;
-    footprint_.push_back(state);
+    state_.x = Random::uniform(init_x_min, init_x_max);
+    state_.y = Random::uniform(init_y_min, init_y_max);
+    state_.v = Random::uniform(init_v_min, init_v_max);
+    state_.yaw = init_yaw;
+    footprint_.push_back(state_);
 }
 
 void Vehicle::excute(void) {
     if (is_get_target()) {
         have_got_target_ = true;
-        state.v = 0;
+        state_.v = 0;
         cur_action_ = Action::MAINTAIN;
         excepted_traj_ = StateList();
     } else {
-        std::pair<Action, StateList> act_and_traj = planner.planning(*this);
+        std::pair<Action, StateList> act_and_traj = planner_.planning(*this);
         cur_action_ = act_and_traj.first;
         excepted_traj_ = act_and_traj.second;
         auto cmd = Node::enable_frenet_simulation
-                       ? utils::new_get_action_value(state, *target_line_converter_,
+                       ? utils::new_get_action_value(state_, *target_line_converter_,
                                                      kDefaultWheelBase, cur_action_)
                        : utils::get_action_value(cur_action_);
-        state = utils::kinematic_propagate(state, cmd, dt_, Node::enable_frenet_simulation);
-        footprint_.push_back(state);
+        state_ = utils::kinematic_propagate(state_, cmd, dt_, Node::enable_frenet_simulation);
+        footprint_.push_back(state_);
     }
 }
 
 void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
                            bool fill_mode /* = false */) {
     if (draw_style == "realistic" && imshow_func != nullptr) {
-        imshow(outlook_, state, {agent_param_.length, agent_param_.width});
+        imshow(outlook_, state_, {agent_param_.length, agent_param_.width});
     } else {
         Eigen::Matrix<double, 2, 2, Eigen::RowMajor> head;
         Eigen::Matrix2d rot;
         head << 0.3 * agent_param_.length, 0.3 * agent_param_.length, 0.5 * agent_param_.width,
             -0.5 * agent_param_.width;
-        rot << cos(state.yaw), -sin(state.yaw), sin(state.yaw), cos(state.yaw);
+        rot << cos(state_.yaw), -sin(state_.yaw), sin(state_.yaw), cos(state_.yaw);
 
         head = rot * head;
-        head += Eigen::Vector2d(state.x, state.y).replicate(1, 2);
-        vehicle_box2d = AgentBase::get_box2d(state, agent_param_);
+        head += Eigen::Vector2d(state_.x, state_.y).replicate(1, 2);
+        vehicle_box2d_ = AgentBase::get_box2d(state_, agent_param_);
 
         std::vector<std::vector<double>> box2d_vec(2);
         std::vector<std::vector<double>> head_vec(2);
-        box2d_vec[0].assign(vehicle_box2d.row(0).data(),
-                            vehicle_box2d.row(0).data() + vehicle_box2d.cols());
-        box2d_vec[1].assign(vehicle_box2d.row(1).data(),
-                            vehicle_box2d.row(1).data() + vehicle_box2d.cols());
+        box2d_vec[0].assign(vehicle_box2d_.row(0).data(),
+                            vehicle_box2d_.row(0).data() + vehicle_box2d_.cols());
+        box2d_vec[1].assign(vehicle_box2d_.row(1).data(),
+                            vehicle_box2d_.row(1).data() + vehicle_box2d_.cols());
         head_vec[0].assign(head.row(0).data(), head.row(0).data() + head.cols());
         head_vec[1].assign(head.row(1).data(), head.row(1).data() + head.cols());
 
@@ -188,7 +188,7 @@ void Vehicle::draw_vehicle(std::string draw_style /* = "realistic"*/,
 }
 
 void VehicleList::reset(void) {
-    for (std::shared_ptr<Vehicle>& vehicle : vehicle_list) {
+    for (std::shared_ptr<Vehicle>& vehicle : vehicle_list_) {
         vehicle->reset();
     }
     update_track_objects();
@@ -196,19 +196,19 @@ void VehicleList::reset(void) {
 
 bool VehicleList::is_all_get_target(void) {
     bool all_get_target = std::all_of(
-        vehicle_list.begin(), vehicle_list.end(),
+        vehicle_list_.begin(), vehicle_list_.end(),
         [](const std::shared_ptr<Vehicle> vehicle) { return vehicle->is_get_target(); });
 
     return all_get_target;
 }
 
 bool VehicleList::is_any_collision(void) {
-    for (int i = 0; i < vehicle_list.size() - 1; ++i) {
-        for (int j = i + 1; j < vehicle_list.size(); ++j) {
+    for (int i = 0; i < vehicle_list_.size() - 1; ++i) {
+        for (int j = i + 1; j < vehicle_list_.size(); ++j) {
             if (utils::has_overlap(
-                    AgentBase::get_box2d(vehicle_list[i]->state, vehicle_list[i]->agent_param_),
-                    AgentBase::get_box2d(vehicle_list[j]->state,
-                                           vehicle_list[j]->agent_param_))) {
+                    AgentBase::get_box2d(vehicle_list_[i]->state(), vehicle_list_[i]->agent_param_),
+                    AgentBase::get_box2d(vehicle_list_[j]->state(),
+                                         vehicle_list_[j]->agent_param_))) {
                 return true;
             }
         }
@@ -218,23 +218,23 @@ bool VehicleList::is_any_collision(void) {
 }
 
 void VehicleList::push_back(std::shared_ptr<Vehicle> vehicle) {
-    if (vehicle_names.count(vehicle->name) > 0) {
-        spdlog::error("vehicle name [{}] duplication is not acceptable !", vehicle->name);
+    if (vehicle_names_.count(vehicle->name()) > 0) {
+        spdlog::error("vehicle name [{}] duplication is not acceptable !", vehicle->name());
         std::exit(EXIT_FAILURE);
     } else {
-        vehicle_list.push_back(vehicle);
-        vehicle_names.insert(vehicle->name);
+        vehicle_list_.push_back(vehicle);
+        vehicle_names_.insert(vehicle->name());
     }
 }
 
 void VehicleList::pop_back(void) {
-    vehicle_names.erase(vehicle_list.back()->name);
-    vehicle_list.pop_back();
+    vehicle_names_.erase(vehicle_list_.back()->name());
+    vehicle_list_.pop_back();
 }
 
 std::shared_ptr<Vehicle> VehicleList::operator[](std::string name) {
-    for (std::shared_ptr<Vehicle> vehicle : vehicle_list) {
-        if (vehicle->name == name) {
+    for (std::shared_ptr<Vehicle> vehicle : vehicle_list_) {
+        if (vehicle->name() == name) {
             return vehicle;
         }
     }
@@ -243,37 +243,38 @@ std::shared_ptr<Vehicle> VehicleList::operator[](std::string name) {
 }
 
 void VehicleList::set_track_objects(void) {
-    for (size_t i = 0; i < vehicle_list.size(); ++i) {
-        for (size_t j = 0; j < vehicle_list.size(); ++j) {
+    for (size_t i = 0; i < vehicle_list_.size(); ++i) {
+        for (size_t j = 0; j < vehicle_list_.size(); ++j) {
             if (j != i) {
-                TrackedObject track_object(vehicle_list[j]->name);
-                track_object.state = vehicle_list[j]->state;
-                track_object.target_ = vehicle_list[j]->target_;
-                track_object.target_line_converter_ = vehicle_list[j]->target_line_converter_;
-                track_object.agent_param = vehicle_list[j]->agent_param_;
-                vehicle_list[i]->tracked_objects_.emplace_back(track_object);
+                TrackedObject track_object(vehicle_list_[j]->name());
+                track_object.mutable_state() = vehicle_list_[j]->state();
+                track_object.mutable_target() = vehicle_list_[j]->target();
+                track_object.mutable_target_line_converter() =
+                    vehicle_list_[j]->target_line_converter();
+                track_object.mutable_agent_param() = vehicle_list_[j]->agent_param_;
+                vehicle_list_[i]->mutable_tracked_objects().emplace_back(track_object);
             }
         }
     }
 }
 
 void VehicleList::update_track_objects(void) {
-    for (std::shared_ptr<Vehicle>& vehicle : vehicle_list) {
-        for (TrackedObject& object : vehicle->tracked_objects_) {
-            object.state = (*this)[object.name]->state;
+    for (std::shared_ptr<Vehicle>& vehicle : vehicle_list_) {
+        for (TrackedObject& object : vehicle->mutable_tracked_objects()) {
+            object.mutable_state() = (*this)[object.name()]->state();
         }
     }
 }
 
 std::vector<AgentBase> VehicleList::exclude(int ego_idx) {
-    std::shared_ptr<Vehicle> ego_vehicle = vehicle_list[ego_idx];
+    std::shared_ptr<Vehicle> ego_vehicle = vehicle_list_[ego_idx];
     return exclude(ego_vehicle);
 }
 
 std::vector<AgentBase> VehicleList::exclude(std::shared_ptr<Vehicle> ego) {
     std::vector<AgentBase> exclude_list;
-    for (std::shared_ptr<Vehicle> vehicle : vehicle_list) {
-        if (vehicle->name != ego->name) {
+    for (std::shared_ptr<Vehicle> vehicle : vehicle_list_) {
+        if (vehicle->name() != ego->name()) {
             exclude_list.push_back(*vehicle);
         }
     }

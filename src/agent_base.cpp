@@ -29,5 +29,5 @@ void AgentBase::set_level(int l) {
 }
 
 bool AgentBase::is_get_target(void) const {
-    return have_got_target_ || hypot(state.x - target_.x, state.y - target_.y) < 1.7;
+    return have_got_target_ || hypot(state_.x - target_.x, state_.y - target_.y) < 1.7;
 }

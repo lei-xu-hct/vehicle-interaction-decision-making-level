@@ -60,16 +60,7 @@ class MonteCarloTreeSearch {
 };
 
 class KLevelPlanner {
-  private:
-    int steps;
-    YAML::Node config;
-
-    KLevelPlanner(const KLevelPlanner& single) = delete;
-    const KLevelPlanner& operator=(const KLevelPlanner& single) = delete;
-    KLevelPlanner(const YAML::Node& cfg) : config(cfg) { steps = cfg["max_step"].as<int>(); }
-    ~KLevelPlanner() {}
-
-  public:
+   public:
     static KLevelPlanner& get_instance(const YAML::Node& cfg) {
         static KLevelPlanner planner_(cfg);
         return planner_;
@@ -80,4 +71,13 @@ class KLevelPlanner {
         const AgentBase& ego, const std::vector<StateList>& traj) const;
     std::vector<StateList> get_prediction(const AgentBase& ego,
                                           const std::vector<AgentBase>& others) const;
+
+  private:
+    int steps_;
+    YAML::Node config_;
+
+    KLevelPlanner(const KLevelPlanner& single) = delete;
+    const KLevelPlanner& operator=(const KLevelPlanner& single) = delete;
+    KLevelPlanner(const YAML::Node& cfg) : config_(cfg) { steps_ = cfg["max_step"].as<int>(); }
+    ~KLevelPlanner() {}
 };
